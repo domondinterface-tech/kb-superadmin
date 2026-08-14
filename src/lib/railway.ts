@@ -154,10 +154,17 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
 
     // SQLite lives on disk (see myaccountingapp/README.md) — without a mounted
     // Volume the database is lost on every redeploy, so this is not optional.
-    await createVolume(projectId, serviceId, "/app/prisma");
+    //
+    // Mount path must NOT be /app/prisma (or any path already inside the
+    // deployed image): Railway Volumes are mounted over whatever's already at
+    // that path, so schema.prisma and the migrations/ directory baked into
+    // the image would become invisible to Prisma at runtime ("file or
+    // directory not found"). /data is empty in the image, so nothing gets
+    // shadowed — only the mutable dev.db file needs to persist here.
+    await createVolume(projectId, serviceId, "/data");
 
     await setVariables(projectId, serviceId, {
-      DATABASE_URL: "file:/app/prisma/dev.db",
+      DATABASE_URL: "file:/data/dev.db",
       ADMIN_EMAIL: input.adminEmail,
       ADMIN_PASSWORD: adminTempPassword,
       ADMIN_NAME: "Admin",
