@@ -45,7 +45,7 @@ import crypto from "crypto";
 const RAILWAY_API_URL = "https://backboard.railway.app/graphql/v2";
 
 // The KB Books codebase every tenant gets their own deployed copy of.
-const KB_BOOKS_REPO = "domondinterface-tech/myaccountingapp";
+const KB_BOOKS_REPO = "domondinterface-tech/MyAccountingApp";
 const KB_BOOKS_BRANCH = "main";
 
 // The Railway workspace ("domondinterface-tech's Projects") that has the
