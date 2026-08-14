@@ -6,16 +6,27 @@
 // Mutation shapes below were confirmed against a live introspection query run
 // from outside this sandbox (which has no direct network path to Railway) —
 // see ServiceCreateInput, ProjectCreateInput, ServiceSourceInput,
-// VolumeCreateInput, VariableUpsertInput, ServiceDomainCreateInput, and
-// Project.baseEnvironmentId. Two things this confirmed:
+// VolumeCreateInput, VariableUpsertInput, ServiceDomainCreateInput,
+// ServiceInstanceDeploy, and Project.baseEnvironmentId/primaryEnvironmentId.
+// Confirmed live, in order of discovery:
 //   - `branch` is a top-level field on ServiceCreateInput, NOT nested inside
 //     `source` (ServiceSourceInput only accepts `repo`/`image`).
 //   - VariableUpsertInput and ServiceDomainCreateInput both require a real
 //     `environmentId` (Railway scopes services to an Environment within a
-//     Project, e.g. "production") — every project has one from creation,
-//     available directly as Project.baseEnvironmentId.
-// ServiceInstanceDeploy's exact input shape is still unconfirmed — if
-// provisioning fails specifically at the deploy-trigger step, that's why.
+//     Project, e.g. "production").
+//   - Project.baseEnvironmentId is for PR-environment base-branch tracking
+//     and is null on a normal project — the real default environment id is
+//     Project.primaryEnvironmentId.
+//   - serviceInstanceDeploy takes serviceId AND environmentId as direct
+//     arguments, not wrapped in an input object.
+//   - projectCreate with no workspaceId lands the project in the caller's
+//     default workspace, which is NOT necessarily the workspace holding the
+//     Railway↔GitHub App installation — a project created that way got
+//     "Repository ... not found or is not accessible" when deploying, even
+//     though the exact same repo already deploys fine elsewhere on the
+//     account. RAILWAY_WORKSPACE_ID pins every tenant project to the
+//     workspace where domondinterface-tech/myaccountingapp is actually
+//     accessible.
 
 import crypto from "crypto";
 
@@ -24,6 +35,11 @@ const RAILWAY_API_URL = "https://backboard.railway.app/graphql/v2";
 // The KB Books codebase every tenant gets their own deployed copy of.
 const KB_BOOKS_REPO = "domondinterface-tech/myaccountingapp";
 const KB_BOOKS_BRANCH = "main";
+
+// The Railway workspace ("domondinterface-tech's Projects") that has the
+// GitHub App installation with access to KB_BOOKS_REPO. Confirmed live via
+// `project(id: <a known project's id>) { workspaceId }`.
+const RAILWAY_WORKSPACE_ID = "1996eb18-dc72-400d-a2b1-fe58c0b5664e";
 
 export type ProvisionInput = {
   tenantId: string;
@@ -105,7 +121,7 @@ async function createProject(name: string): Promise<{ projectId: string; environ
         environments { edges { node { id } } }
       }
     }`,
-    { input: { name } },
+    { input: { name, workspaceId: RAILWAY_WORKSPACE_ID } },
   );
   const { id: projectId, primaryEnvironmentId, baseEnvironmentId, environments } = data.projectCreate;
   // baseEnvironmentId is null on a normal project (it's for PR-environment
