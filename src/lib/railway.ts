@@ -149,6 +149,15 @@ async function triggerDeploy(serviceId: string): Promise<void> {
   );
 }
 
+async function deleteProject(projectId: string): Promise<void> {
+  await railwayGraphQL(
+    `mutation ProjectDelete($id: String!) {
+      projectDelete(id: $id)
+    }`,
+    { id: projectId },
+  );
+}
+
 /**
  * Full tenant provisioning flow: new Railway project → service deployed from
  * the KB Books repo → persistent Volume for the SQLite file → tenant-specific
@@ -165,8 +174,14 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   const adminTempPassword = randomPassword();
   const dangerZonePin = randomPin();
 
+  // Tracked outside the try block so the catch handler can roll back a
+  // project that got created before a later step failed — otherwise every
+  // failed attempt past this point leaves an empty orphan project behind.
+  let createdProjectId: string | undefined;
+
   try {
     const projectId = await createProject(`kb-books-${input.name}`);
+    createdProjectId = projectId;
     const serviceId = await createServiceFromRepo(projectId, "kb-books");
 
     // SQLite lives on disk (see myaccountingapp/README.md) — without a mounted
@@ -196,6 +211,17 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     return { ok: true, projectId, serviceId, appUrl: `https://${domain}`, adminTempPassword };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+
+    if (createdProjectId) {
+      try {
+        await deleteProject(createdProjectId);
+      } catch (cleanupErr) {
+        // Don't let a failed rollback hide the original error — just log it
+        // so an orphan project doesn't go unnoticed.
+        console.error(`Failed to roll back orphan project ${createdProjectId}`, cleanupErr);
+      }
+    }
+
     return { ok: false, error: message };
   }
 }
