@@ -3,15 +3,19 @@
 // own persistent Volume (SQLite lives on disk — see that repo's README) and its
 // own BRAND_NAME/ADMIN_* environment variables.
 //
-// STATUS: written against Railway's public GraphQL API from general knowledge of
-// its shape (endpoint, auth header, typical mutation names). This sandbox has no
-// network access to Railway to run a live schema introspection or a real test
-// call, and no RAILWAY_API_TOKEN has been provided yet (see ROADMAP.md in the
-// myaccountingapp repo). Before relying on this in production:
-//   1. Run an introspection query against RAILWAY_API_URL with a real token.
-//   2. Confirm each mutation name/argument shape below still matches — Railway's
-//      API is not guaranteed stable across versions.
-//   3. Do a real end-to-end provisionTenant() call against a throwaway tenant.
+// Mutation shapes below were confirmed against a live introspection query run
+// from outside this sandbox (which has no direct network path to Railway) —
+// see ServiceCreateInput, ProjectCreateInput, ServiceSourceInput,
+// VolumeCreateInput, VariableUpsertInput, ServiceDomainCreateInput, and
+// Project.baseEnvironmentId. Two things this confirmed:
+//   - `branch` is a top-level field on ServiceCreateInput, NOT nested inside
+//     `source` (ServiceSourceInput only accepts `repo`/`image`).
+//   - VariableUpsertInput and ServiceDomainCreateInput both require a real
+//     `environmentId` (Railway scopes services to an Environment within a
+//     Project, e.g. "production") — every project has one from creation,
+//     available directly as Project.baseEnvironmentId.
+// ServiceInstanceDeploy's exact input shape is still unconfirmed — if
+// provisioning fails specifically at the deploy-trigger step, that's why.
 
 import crypto from "crypto";
 
@@ -84,17 +88,21 @@ function randomPin(): string {
   return String(crypto.randomInt(1000, 10000));
 }
 
-async function createProject(name: string): Promise<string> {
-  const data = await railwayGraphQL<{ projectCreate: { id: string } }>(
+async function createProject(name: string): Promise<{ projectId: string; environmentId: string }> {
+  const data = await railwayGraphQL<{ projectCreate: { id: string; baseEnvironmentId: string | null } }>(
     `mutation ProjectCreate($input: ProjectCreateInput!) {
-      projectCreate(input: $input) { id }
+      projectCreate(input: $input) { id baseEnvironmentId }
     }`,
     { input: { name } },
   );
-  return data.projectCreate.id;
+  const { id: projectId, baseEnvironmentId } = data.projectCreate;
+  if (!baseEnvironmentId) {
+    throw new RailwayApiError(`Pwojè ${projectId} kreye men li pa gen baseEnvironmentId — pa ka kontinye san sa.`);
+  }
+  return { projectId, environmentId: baseEnvironmentId };
 }
 
-async function createServiceFromRepo(projectId: string, name: string): Promise<string> {
+async function createServiceFromRepo(projectId: string, environmentId: string, name: string): Promise<string> {
   const data = await railwayGraphQL<{ serviceCreate: { id: string } }>(
     `mutation ServiceCreate($input: ServiceCreateInput!) {
       serviceCreate(input: $input) { id }
@@ -102,40 +110,47 @@ async function createServiceFromRepo(projectId: string, name: string): Promise<s
     {
       input: {
         projectId,
+        environmentId,
         name,
-        source: { repo: KB_BOOKS_REPO, branch: KB_BOOKS_BRANCH },
+        branch: KB_BOOKS_BRANCH,
+        source: { repo: KB_BOOKS_REPO },
       },
     },
   );
   return data.serviceCreate.id;
 }
 
-async function createVolume(projectId: string, serviceId: string, mountPath: string): Promise<void> {
+async function createVolume(projectId: string, environmentId: string, serviceId: string, mountPath: string): Promise<void> {
   await railwayGraphQL(
     `mutation VolumeCreate($input: VolumeCreateInput!) {
       volumeCreate(input: $input) { id }
     }`,
-    { input: { projectId, serviceId, mountPath } },
+    { input: { projectId, environmentId, serviceId, mountPath } },
   );
 }
 
-async function setVariables(projectId: string, serviceId: string, variables: Record<string, string>): Promise<void> {
+async function setVariables(
+  projectId: string,
+  environmentId: string,
+  serviceId: string,
+  variables: Record<string, string>,
+): Promise<void> {
   for (const [name, value] of Object.entries(variables)) {
     await railwayGraphQL(
       `mutation VariableUpsert($input: VariableUpsertInput!) {
         variableUpsert(input: $input)
       }`,
-      { input: { projectId, serviceId, name, value } },
+      { input: { projectId, environmentId, serviceId, name, value } },
     );
   }
 }
 
-async function createDomain(serviceId: string): Promise<string> {
+async function createDomain(environmentId: string, serviceId: string): Promise<string> {
   const data = await railwayGraphQL<{ serviceDomainCreate: { domain: string } }>(
     `mutation ServiceDomainCreate($input: ServiceDomainCreateInput!) {
       serviceDomainCreate(input: $input) { domain }
     }`,
-    { input: { serviceId } },
+    { input: { environmentId, serviceId } },
   );
   return data.serviceDomainCreate.domain;
 }
@@ -180,9 +195,9 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   let createdProjectId: string | undefined;
 
   try {
-    const projectId = await createProject(`kb-books-${input.name}`);
+    const { projectId, environmentId } = await createProject(`kb-books-${input.name}`);
     createdProjectId = projectId;
-    const serviceId = await createServiceFromRepo(projectId, "kb-books");
+    const serviceId = await createServiceFromRepo(projectId, environmentId, "kb-books");
 
     // SQLite lives on disk (see myaccountingapp/README.md) — without a mounted
     // Volume the database is lost on every redeploy, so this is not optional.
@@ -193,9 +208,9 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     // the image would become invisible to Prisma at runtime ("file or
     // directory not found"). /data is empty in the image, so nothing gets
     // shadowed — only the mutable dev.db file needs to persist here.
-    await createVolume(projectId, serviceId, "/data");
+    await createVolume(projectId, environmentId, serviceId, "/data");
 
-    await setVariables(projectId, serviceId, {
+    await setVariables(projectId, environmentId, serviceId, {
       DATABASE_URL: "file:/data/dev.db",
       ADMIN_EMAIL: input.adminEmail,
       ADMIN_PASSWORD: adminTempPassword,
@@ -205,7 +220,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       NODE_ENV: "production",
     });
 
-    const domain = await createDomain(serviceId);
+    const domain = await createDomain(environmentId, serviceId);
     await triggerDeploy(serviceId);
 
     return { ok: true, projectId, serviceId, appUrl: `https://${domain}`, adminTempPassword };
