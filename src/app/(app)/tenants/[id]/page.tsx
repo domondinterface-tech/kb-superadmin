@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Card, PageHeader, Badge, SubmitButton } from "@/components/ui";
-import { runProvisioning } from "@/lib/actions/tenants";
+import { runProvisioning, runFinishDeploy } from "@/lib/actions/tenants";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +11,8 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
   if (!tenant) notFound();
 
   const provision = runProvisioning.bind(null, tenant.id);
+  const finishDeploy = runFinishDeploy.bind(null, tenant.id);
+  const railwayProjectUrl = tenant.railwayProjectId ? `https://railway.com/project/${tenant.railwayProjectId}` : null;
 
   return (
     <div className="space-y-6">
@@ -22,7 +24,7 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
             tone={
               tenant.status === "ACTIVE"
                 ? "positive"
-                : tenant.status === "PROVISIONING"
+                : tenant.status === "PROVISIONING" || tenant.status === "NEEDS_GITHUB_CONNECT"
                   ? "warning"
                   : tenant.status === "PENDING"
                     ? "default"
@@ -31,7 +33,7 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
           >
             {tenant.status}
           </Badge>
-          {tenant.status !== "PROVISIONING" && (
+          {tenant.status !== "PROVISIONING" && tenant.status !== "NEEDS_GITHUB_CONNECT" && (
             <form action={provision}>
               <SubmitButton>{tenant.status === "ACTIVE" ? "Re-provizyone" : "Provizyone Kounye A"}</SubmitButton>
             </form>
@@ -47,6 +49,37 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
                 Mete varyab anviwònman <code>RAILWAY_API_TOKEN</code> sou sèvè SuperAdmin la, epi klike &quot;Provizyone Kounye A&quot; ankò.
               </p>
             )}
+          </div>
+        )}
+
+        {tenant.status === "NEEDS_GITHUB_CONNECT" && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <p className="text-sm font-medium text-amber-800">Rete yon dènye etap manyèl</p>
+            <p className="mt-1 text-sm text-amber-700">
+              Pwojè Railway a, sèvis la, Volume la, domèn lan, ak tout varyab yo deja kreye. Sèl bagay ki rete: konekte repo GitHub la nan
+              dashboard Railway a (token API la pa gen otorizasyon GitHub pou fè sa otomatikman).
+            </p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-amber-700">
+              <li>
+                Ale sou{" "}
+                {railwayProjectUrl ? (
+                  <a href={railwayProjectUrl} target="_blank" rel="noreferrer" className="underline">
+                    pwojè Railway a
+                  </a>
+                ) : (
+                  "pwojè Railway a"
+                )}
+                .
+              </li>
+              <li>
+                Klike sou sèvis la (non li: <code>kb-books</code>) → <strong>Settings → Source</strong> → konekte repo{" "}
+                <code>domondinterface-tech/myaccountingapp</code> (branch <code>main</code>).
+              </li>
+              <li>Retounen isit la epi klike bouton anba a pou deklanche premye deplwaman an.</li>
+            </ol>
+            <form action={finishDeploy} className="mt-3">
+              <SubmitButton>Fini Deplwaman an</SubmitButton>
+            </form>
           </div>
         )}
 

@@ -26,7 +26,19 @@
 //     though the exact same repo already deploys fine elsewhere on the
 //     account. RAILWAY_WORKSPACE_ID pins every tenant project to the
 //     workspace where domondinterface-tech/myaccountingapp is actually
-//     accessible.
+//     accessible. Pinning the workspace alone did NOT fix the "not
+//     accessible" error, though — confirmed by a further live check that
+//     `me` and `githubRepos` both come back "Not Authorized" for this
+//     token. This API token (created from Railway's Tokens page, scoped to
+//     a workspace) simply doesn't carry GitHub App authorization — that's
+//     tied to a logged-in user's own OAuth session, which no API token
+//     exposes. There is no mutation-shape fix for this.
+//
+// Because of that, provisioning stops short of connecting the GitHub source:
+// it creates the project/service/volume/variables/domain, then returns
+// needsManualConnect so the SuperAdmin can connect the repo once by hand in
+// the Railway dashboard (the one flow that does carry real GitHub auth), and
+// call finishDeploy() afterwards to trigger the first deploy via API.
 
 import crypto from "crypto";
 
@@ -49,8 +61,18 @@ export type ProvisionInput = {
 };
 
 export type ProvisionResult =
-  | { ok: true; projectId: string; serviceId: string; appUrl: string; adminTempPassword: string }
+  | {
+      ok: true;
+      needsManualConnect: true;
+      projectId: string;
+      serviceId: string;
+      environmentId: string;
+      appUrl: string;
+      adminTempPassword: string;
+    }
   | { ok: false; error: string };
+
+export type DeployResult = { ok: true } | { ok: false; error: string };
 
 class RailwayApiError extends Error {}
 
@@ -206,9 +228,10 @@ async function deleteProject(projectId: string): Promise<void> {
 }
 
 /**
- * Full tenant provisioning flow: new Railway project → service deployed from
- * the KB Books repo → persistent Volume for the SQLite file → tenant-specific
- * env vars → public domain → deploy trigger.
+ * Tenant provisioning flow: new Railway project → service pointed at the KB
+ * Books repo → persistent Volume for the SQLite file → tenant-specific env
+ * vars → public domain. Stops there — see the file header for why the actual
+ * deploy trigger is a separate manual-then-API step (finishDeploy below).
  *
  * Returns `{ ok: false }` (never throws) so the caller can persist the error
  * onto the Tenant row instead of losing it to an unhandled rejection.
@@ -253,9 +276,16 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     });
 
     const domain = await createDomain(environmentId, serviceId);
-    await triggerDeploy(environmentId, serviceId);
 
-    return { ok: true, projectId, serviceId, appUrl: `https://${domain}`, adminTempPassword };
+    return {
+      ok: true,
+      needsManualConnect: true,
+      projectId,
+      serviceId,
+      environmentId,
+      appUrl: `https://${domain}`,
+      adminTempPassword,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
 
@@ -269,6 +299,26 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       }
     }
 
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * Second half of provisioning: call once the SuperAdmin has connected the
+ * GitHub repo by hand in the Railway dashboard for this service (the one
+ * flow that carries real GitHub authorization — see the file header). Just
+ * triggers the first deploy; everything else was already set up by
+ * provisionTenant().
+ */
+export async function finishDeploy(environmentId: string, serviceId: string): Promise<DeployResult> {
+  if (!process.env.RAILWAY_API_TOKEN) {
+    return { ok: false, error: "RAILWAY_API_TOKEN pa konfigire sou sèvè a." };
+  }
+  try {
+    await triggerDeploy(environmentId, serviceId);
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: message };
   }
 }

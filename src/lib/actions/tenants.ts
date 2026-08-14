@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/session";
-import { provisionTenant } from "@/lib/railway";
+import { provisionTenant, finishDeploy } from "@/lib/railway";
 
 export type CreateTenantState = { error: string | null };
 
@@ -58,9 +58,10 @@ export async function runProvisioning(tenantId: string): Promise<void> {
     await prisma.tenant.update({
       where: { id: tenantId },
       data: {
-        status: "ACTIVE",
+        status: "NEEDS_GITHUB_CONNECT",
         railwayProjectId: result.projectId,
         railwayServiceId: result.serviceId,
+        railwayEnvironmentId: result.environmentId,
         appUrl: result.appUrl,
         adminTempPassword: result.adminTempPassword,
         errorMessage: null,
@@ -71,6 +72,35 @@ export async function runProvisioning(tenantId: string): Promise<void> {
     await prisma.tenant.update({
       where: { id: tenantId },
       data: { status: blocked ? "BLOCKED_NO_TOKEN" : "FAILED", errorMessage: result.error },
+    });
+  }
+
+  revalidatePath(`/tenants/${tenantId}`);
+  revalidatePath("/");
+}
+
+/**
+ * Second half of provisioning: call once the SuperAdmin has connected the
+ * GitHub repo by hand in the Railway dashboard for this tenant's service.
+ */
+export async function runFinishDeploy(tenantId: string): Promise<void> {
+  await requireUser();
+
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  if (!tenant || tenant.status !== "NEEDS_GITHUB_CONNECT") return;
+  if (!tenant.railwayServiceId || !tenant.railwayEnvironmentId) return;
+
+  const result = await finishDeploy(tenant.railwayEnvironmentId, tenant.railwayServiceId);
+
+  if (result.ok) {
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { status: "ACTIVE", errorMessage: null },
+    });
+  } else {
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { errorMessage: result.error },
     });
   }
 

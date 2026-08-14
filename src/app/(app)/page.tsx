@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 const STATUS_TONE: Record<TenantStatus, "default" | "positive" | "negative" | "warning"> = {
   PENDING: "default",
   PROVISIONING: "warning",
+  NEEDS_GITHUB_CONNECT: "warning",
   ACTIVE: "positive",
   FAILED: "negative",
   BLOCKED_NO_TOKEN: "negative",
@@ -16,6 +17,7 @@ const STATUS_TONE: Record<TenantStatus, "default" | "positive" | "negative" | "w
 const STATUS_LABEL: Record<TenantStatus, string> = {
   PENDING: "An atant",
   PROVISIONING: "Ap kreye...",
+  NEEDS_GITHUB_CONNECT: "Mande konekte GitHub",
   ACTIVE: "Aktif",
   FAILED: "Echwe",
   BLOCKED_NO_TOKEN: "Bloke — pa gen token",
