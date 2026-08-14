@@ -49,9 +49,26 @@ async function railwayGraphQL<T>(query: string, variables: Record<string, unknow
     body: JSON.stringify({ query, variables }),
   });
 
-  const json = (await res.json()) as { data?: T; errors?: { message: string }[] };
+  const json = (await res.json()) as {
+    data?: T;
+    errors?: { message: string; extensions?: Record<string, unknown>; path?: (string | number)[] }[];
+  };
+
   if (json.errors?.length) {
-    throw new RailwayApiError(json.errors.map((e) => e.message).join("; "));
+    // Railway's top-level error messages are often generic ("Problem processing
+    // request") — the useful detail lives in each error's `extensions`/`path`.
+    // Log the raw payload server-side (visible in Railway's own Deploy Logs for
+    // this service) and surface it in the thrown message too, since that's what
+    // ends up on the Tenant row for the SuperAdmin to read.
+    console.error("Railway GraphQL error", JSON.stringify(json.errors, null, 2));
+    const detail = json.errors
+      .map((e) => {
+        const extra = e.extensions ? ` ${JSON.stringify(e.extensions)}` : "";
+        const path = e.path ? ` [${e.path.join(".")}]` : "";
+        return `${e.message}${path}${extra}`;
+      })
+      .join("; ");
+    throw new RailwayApiError(detail);
   }
   if (!json.data) {
     throw new RailwayApiError(`Railway API pa retounen okenn done (HTTP ${res.status}).`);
