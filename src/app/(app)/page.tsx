@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Card, PageHeader, Badge } from "@/components/ui";
+import { toggleTenantActive } from "@/lib/actions/tenants";
 import type { TenantStatus } from "@/generated/prisma/enums";
 
 export const dynamic = "force-dynamic";
@@ -50,25 +51,36 @@ export default async function DashboardPage() {
                   <th className="pb-2 pr-4">Mak</th>
                   <th className="pb-2 pr-4">Imèl Admin</th>
                   <th className="pb-2 pr-4">Estati</th>
+                  <th className="pb-2 pr-4">Aktif</th>
                   <th className="pb-2">Kreye</th>
                 </tr>
               </thead>
               <tbody>
-                {tenants.map((t) => (
-                  <tr key={t.id} className="border-b border-slate-100 last:border-0">
-                    <td className="py-2 pr-4">
-                      <Link href={`/tenants/${t.id}`} className="font-medium text-indigo-600 hover:underline">
-                        {t.name}
-                      </Link>
-                    </td>
-                    <td className="py-2 pr-4 text-slate-600">{t.brandName}</td>
-                    <td className="py-2 pr-4 text-slate-600">{t.adminEmail}</td>
-                    <td className="py-2 pr-4">
-                      <Badge tone={STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</Badge>
-                    </td>
-                    <td className="py-2 text-slate-500">{t.createdAt.toLocaleDateString("fr-HT")}</td>
-                  </tr>
-                ))}
+                {tenants.map((t) => {
+                  const toggle = toggleTenantActive.bind(null, t.id);
+                  return (
+                    <tr key={t.id} className="border-b border-slate-100 last:border-0">
+                      <td className="py-2 pr-4">
+                        <Link href={`/tenants/${t.id}`} className="font-medium text-indigo-600 hover:underline">
+                          {t.name}
+                        </Link>
+                      </td>
+                      <td className="py-2 pr-4 text-slate-600">{t.brandName}</td>
+                      <td className="py-2 pr-4 text-slate-600">{t.adminEmail}</td>
+                      <td className="py-2 pr-4">
+                        <Badge tone={STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</Badge>
+                      </td>
+                      <td className="py-2 pr-4">
+                        <form action={toggle}>
+                          <button type="submit" className="cursor-pointer">
+                            <Badge tone={t.active ? "positive" : "default"}>{t.active ? "Aktif" : "Dezaktive"}</Badge>
+                          </button>
+                        </form>
+                      </td>
+                      <td className="py-2 text-slate-500">{t.createdAt.toLocaleDateString("fr-HT")}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -80,6 +80,23 @@ export async function runProvisioning(tenantId: string): Promise<void> {
 }
 
 /**
+ * Flips the tracking-only `active` flag. Does not touch the tenant's Railway
+ * deployment or block their KB Books login — see the schema comment on
+ * Tenant.active.
+ */
+export async function toggleTenantActive(tenantId: string): Promise<void> {
+  await requireUser();
+
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  if (!tenant) return;
+
+  await prisma.tenant.update({ where: { id: tenantId }, data: { active: !tenant.active } });
+
+  revalidatePath(`/tenants/${tenantId}`);
+  revalidatePath("/");
+}
+
+/**
  * Second half of provisioning: call once the SuperAdmin has connected the
  * GitHub repo by hand in the Railway dashboard for this tenant's service.
  */

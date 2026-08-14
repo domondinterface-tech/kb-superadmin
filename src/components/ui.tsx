@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useFormStatus } from "react-dom";
+import { useState } from "react";
 
 export function Card({ title, children, className = "" }: { title?: string; children: ReactNode; className?: string }) {
   return (
@@ -46,14 +47,45 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 export const inputClass =
   "block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white";
 
-export function SubmitButton({ children, pending: pendingOverride }: { children: ReactNode; pending?: boolean }) {
+/** Copies `value` to the clipboard and shows a brief "Kopye!" confirmation. */
+export function CopyButton({ value, label = "Kopye" }: { value: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        await navigator.clipboard.writeText(value);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      className="inline-flex items-center rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+    >
+      {copied ? "Kopye!" : label}
+    </button>
+  );
+}
+
+export function SubmitButton({
+  children,
+  pending: pendingOverride,
+  variant = "primary",
+}: {
+  children: ReactNode;
+  pending?: boolean;
+  variant?: "primary" | "secondary";
+}) {
   const { pending: formPending } = useFormStatus();
   const pending = pendingOverride ?? formPending;
+  const variantClass =
+    variant === "primary"
+      ? "bg-indigo-600 text-white hover:bg-indigo-500"
+      : "border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800";
   return (
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+      className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${variantClass}`}
     >
       {children}
     </button>

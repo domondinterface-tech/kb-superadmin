@@ -1,9 +1,14 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { Card, PageHeader, Badge, SubmitButton } from "@/components/ui";
-import { runProvisioning, runFinishDeploy } from "@/lib/actions/tenants";
+import { Card, PageHeader, Badge, SubmitButton, CopyButton } from "@/components/ui";
+import { runProvisioning, runFinishDeploy, toggleTenantActive } from "@/lib/actions/tenants";
+import { fetchTenantSummary } from "@/lib/tenantSummary";
 
 export const dynamic = "force-dynamic";
+
+function money(n: number, currency: "HTG" | "USD"): string {
+  return `${n.toLocaleString("fr-HT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+}
 
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -12,11 +17,28 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
 
   const provision = runProvisioning.bind(null, tenant.id);
   const finishDeploy = runFinishDeploy.bind(null, tenant.id);
+  const toggleActive = toggleTenantActive.bind(null, tenant.id);
   const railwayProjectUrl = tenant.railwayProjectId ? `https://railway.com/project/${tenant.railwayProjectId}` : null;
+
+  const summary = tenant.status === "ACTIVE" && tenant.appUrl ? await fetchTenantSummary(tenant.appUrl) : null;
 
   return (
     <div className="space-y-6">
-      <PageHeader title={tenant.name} description={tenant.brandName} />
+      <PageHeader
+        title={tenant.name}
+        description={tenant.brandName}
+        action={
+          <form action={toggleActive}>
+            <SubmitButton variant="secondary">{tenant.active ? "Dezaktive" : "Reaktive"}</SubmitButton>
+          </form>
+        }
+      />
+
+      {!tenant.active && (
+        <div className="rounded-md border border-slate-300 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
+          Tenant sa a make <strong>dezaktive</strong> — se yon drapo swivi sèlman, li pa bloke aksè tenant la nan pwòp enstans KB Books li.
+        </div>
+      )}
 
       <Card title="Estati">
         <div className="flex items-center gap-3">
@@ -102,16 +124,70 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
                 <dd className="inline">{tenant.adminEmail}</dd>
               </div>
               {tenant.adminTempPassword && (
-                <div>
-                  <dt className="inline font-medium">Modpas Tanporè: </dt>
-                  <dd className="inline font-mono">{tenant.adminTempPassword}</dd>
+                <div className="flex items-center gap-2">
+                  <dt className="font-medium">Modpas Tanporè: </dt>
+                  <dd className="font-mono">{tenant.adminTempPassword}</dd>
+                  <CopyButton value={tenant.adminTempPassword} />
                 </div>
               )}
             </dl>
+            {tenant.appUrl && (
+              <a
+                href={`${tenant.appUrl}/login`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex items-center rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500"
+              >
+                Ale nan Paj Login Tenant la →
+              </a>
+            )}
             <p className="mt-2 text-xs text-emerald-600">Bay admin tenant la enfòmasyon sa yo yon sèl fwa — mande yo chanje modpas la apre premye koneksyon.</p>
           </div>
         )}
       </Card>
+
+      {tenant.status === "ACTIVE" && (
+        <Card title="Rezime Finansye">
+          {summary?.ok ? (
+            <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-500">Kach Kòf (HTG)</dt>
+                <dd className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(summary.data.cashHTG, "HTG")}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-500">Kach Kòf (USD)</dt>
+                <dd className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(summary.data.cashUSD, "USD")}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-500">Total Aktif</dt>
+                <dd className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(summary.data.totalAsset, "HTG")}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-500">Pwofi Net</dt>
+                <dd className={`mt-1 text-lg font-semibold ${summary.data.netProfit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                  {money(summary.data.netProfit, "HTG")}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-500">Bilan</dt>
+                <dd className="mt-1">
+                  <Badge tone={summary.data.isBalanced ? "positive" : "negative"}>{summary.data.isBalanced ? "Balanse" : "Pa Balanse"}</Badge>
+                </dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="text-sm text-slate-500">
+              {summary ? `Pa t ka chaje rezime finansye a: ${summary.error}` : "Pa gen rezime finansye disponib pou tenant sa a."}
+            </p>
+          )}
+          {summary && !summary.ok && (
+            <p className="mt-2 text-xs text-slate-400">
+              Si sa se yon tenant ki te kreye anvan <code>SUPERADMIN_API_KEY</code> te konfigire, mete menm valè varyab sa a nan Railway pou
+              tenant sa a tou (Variables), epi redeplwaye.
+            </p>
+          )}
+        </Card>
+      )}
 
       <Card title="Detay Teknik">
         <dl className="space-y-2 text-sm">

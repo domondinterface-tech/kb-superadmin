@@ -40,17 +40,22 @@ enum TenantStatus {
 }
 
 model Tenant {
-  id                  String       @id @default(cuid())
-  name                String // internal/display name for the tenant business
-  brandName           String // shown as dict.brand inside their KB Books instance (BRAND_NAME env var)
-  adminEmail          String // first ADMIN login for their KB Books instance
-  adminTempPassword   String? // generated temp password, shown once after successful provisioning
-  status              TenantStatus @default(PENDING)
-  railwayProjectId    String?
-  railwayServiceId    String?
+  id                   String       @id @default(cuid())
+  name                 String // internal/display name for the tenant business
+  brandName            String // shown as dict.brand inside their KB Books instance (BRAND_NAME env var)
+  adminEmail           String // first ADMIN login for their KB Books instance
+  adminTempPassword    String? // generated temp password, shown once after successful provisioning
+  status               TenantStatus @default(PENDING)
+  // Tracking-only flag a SuperAdmin toggles by hand — does NOT block access to
+  // the tenant's KB Books instance (each tenant is its own Railway deployment,
+  // so there's no shared gate to enforce this against without the tenant app
+  // itself checking back in on every login, which it doesn't).
+  active               Boolean      @default(true)
+  railwayProjectId     String?
+  railwayServiceId     String?
   railwayEnvironmentId String?
-  appUrl              String?
-  errorMessage        String?
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  appUrl               String?
+  errorMessage         String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
 }

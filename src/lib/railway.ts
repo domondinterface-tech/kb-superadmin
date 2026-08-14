@@ -273,6 +273,11 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       BRAND_NAME: input.brandName,
       DANGER_ZONE_PIN: dangerZonePin,
       NODE_ENV: "production",
+      // Lets this SuperAdmin fetch a financial summary from the tenant's own
+      // /api/superadmin/summary route (header-auth, no cookie session) —
+      // only set if configured here too, so provisioning still works before
+      // that's set up.
+      ...(process.env.SUPERADMIN_API_KEY ? { SUPERADMIN_API_KEY: process.env.SUPERADMIN_API_KEY } : {}),
     });
 
     const domain = await createDomain(environmentId, serviceId);
