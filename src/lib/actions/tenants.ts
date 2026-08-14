@@ -38,6 +38,12 @@ export async function runProvisioning(tenantId: string): Promise<void> {
 
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
   if (!tenant) return;
+  // Guards against a double-fired click (or any other concurrent duplicate
+  // call) launching two provisionTenant() runs at once — each one calls
+  // Railway's API ~10 times, and a second overlapping run is what was
+  // tripping Railway's per-workspace project-creation rate limit even on
+  // otherwise-idle retries.
+  if (tenant.status === "PROVISIONING") return;
 
   await prisma.tenant.update({ where: { id: tenantId }, data: { status: "PROVISIONING", errorMessage: null } });
 
