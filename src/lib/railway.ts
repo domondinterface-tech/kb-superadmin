@@ -89,17 +89,33 @@ function randomPin(): string {
 }
 
 async function createProject(name: string): Promise<{ projectId: string; environmentId: string }> {
-  const data = await railwayGraphQL<{ projectCreate: { id: string; baseEnvironmentId: string | null } }>(
+  const data = await railwayGraphQL<{
+    projectCreate: {
+      id: string;
+      baseEnvironmentId: string | null;
+      primaryEnvironmentId: string | null;
+      environments: { edges: { node: { id: string } }[] };
+    };
+  }>(
     `mutation ProjectCreate($input: ProjectCreateInput!) {
-      projectCreate(input: $input) { id baseEnvironmentId }
+      projectCreate(input: $input) {
+        id
+        baseEnvironmentId
+        primaryEnvironmentId
+        environments { edges { node { id } } }
+      }
     }`,
     { input: { name } },
   );
-  const { id: projectId, baseEnvironmentId } = data.projectCreate;
-  if (!baseEnvironmentId) {
-    throw new RailwayApiError(`Pwojè ${projectId} kreye men li pa gen baseEnvironmentId — pa ka kontinye san sa.`);
+  const { id: projectId, primaryEnvironmentId, baseEnvironmentId, environments } = data.projectCreate;
+  // baseEnvironmentId is null on a normal project (it's for PR-environment
+  // base-branch tracking) — primaryEnvironmentId is the real default
+  // environment, with the environments connection as a last-resort fallback.
+  const environmentId = primaryEnvironmentId ?? baseEnvironmentId ?? environments.edges[0]?.node.id;
+  if (!environmentId) {
+    throw new RailwayApiError(`Pwojè ${projectId} kreye men li pa gen okenn environment ki disponib — pa ka kontinye san sa.`);
   }
-  return { projectId, environmentId: baseEnvironmentId };
+  return { projectId, environmentId };
 }
 
 async function createServiceFromRepo(projectId: string, environmentId: string, name: string): Promise<string> {
