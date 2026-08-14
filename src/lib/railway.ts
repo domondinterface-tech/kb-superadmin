@@ -171,12 +171,12 @@ async function createDomain(environmentId: string, serviceId: string): Promise<s
   return data.serviceDomainCreate.domain;
 }
 
-async function triggerDeploy(serviceId: string): Promise<void> {
+async function triggerDeploy(environmentId: string, serviceId: string): Promise<void> {
   await railwayGraphQL(
-    `mutation ServiceInstanceDeploy($serviceId: String!) {
-      serviceInstanceDeploy(serviceId: $serviceId)
+    `mutation ServiceInstanceDeploy($serviceId: String!, $environmentId: String!) {
+      serviceInstanceDeploy(serviceId: $serviceId, environmentId: $environmentId)
     }`,
-    { serviceId },
+    { serviceId, environmentId },
   );
 }
 
@@ -237,7 +237,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     });
 
     const domain = await createDomain(environmentId, serviceId);
-    await triggerDeploy(serviceId);
+    await triggerDeploy(environmentId, serviceId);
 
     return { ok: true, projectId, serviceId, appUrl: `https://${domain}`, adminTempPassword };
   } catch (err) {
