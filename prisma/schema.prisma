@@ -1,0 +1,54 @@
+// Prisma schema — SuperAdmin (KB Books multi-tenant provisioning)
+// Owns a tenant registry + its own login; never shares a database with any
+// tenant's KB Books instance.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model SuperAdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  sessions     Session[]
+}
+
+model Session {
+  id        String         @id @default(cuid())
+  token     String         @unique
+  userId    String
+  user      SuperAdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime       @default(now())
+}
+
+enum TenantStatus {
+  PENDING // row created, provisioning not yet attempted
+  PROVISIONING // Railway API calls in flight
+  ACTIVE // deployed and live
+  FAILED // provisioning attempted and errored — see errorMessage
+  BLOCKED_NO_TOKEN // provisioning was attempted with no RAILWAY_API_TOKEN configured
+}
+
+model Tenant {
+  id                String       @id @default(cuid())
+  name              String // internal/display name for the tenant business
+  brandName         String // shown as dict.brand inside their KB Books instance (BRAND_NAME env var)
+  adminEmail        String // first ADMIN login for their KB Books instance
+  adminTempPassword String? // generated temp password, shown once after successful provisioning
+  status            TenantStatus @default(PENDING)
+  railwayProjectId  String?
+  railwayServiceId  String?
+  appUrl            String?
+  errorMessage      String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
