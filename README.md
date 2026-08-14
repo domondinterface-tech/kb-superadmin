@@ -14,31 +14,49 @@ Gade `ROADMAP.md` nan repo `myaccountingapp` pou kontèks konplè sou pwojè sa 
 2. Sa kreye yon ranje `Tenant` ak estati `PENDING`.
 3. Lè SuperAdmin la klike "Provizyone Kounye A" (`src/lib/actions/tenants.ts` →
    `runProvisioning`), `src/lib/railway.ts` rele Railway API a pou:
-   - Kreye yon nouvo pwojè + sèvis Railway, deplwaye menm kòd KB Books la
-     (`domondinterface-tech/myaccountingapp`, branch `main`)
-   - Tache yon Volume pèsistan (kritik — SQLite pèdi si pa gen Volume, gade
-     README KB Books la)
+   - Kreye yon nouvo pwojè + sèvis Railway
+   - Tache yon Volume pèsistan sou `/data` (kritik — SQLite pèdi si pa gen
+     Volume, gade README KB Books la), ak `DATABASE_URL=file:/data/dev.db`
    - Mete varyab anviwònman tenant la (`ADMIN_EMAIL`, `ADMIN_PASSWORD` jenere,
-     `BRAND_NAME`, `DANGER_ZONE_PIN` jenere, elatriye)
-   - Kreye yon domèn piblik e lanse premye deplwaman an
-4. Si sa reyisi, tenant la vin `ACTIVE` ak yon URL ak yon modpas tanporè pou
+     `BRAND_NAME`, `DANGER_ZONE_PIN` jenere, `SUPERADMIN_API_KEY`, elatriye)
+   - Kreye yon domèn piblik
+   - Tenant la vin `NEEDS_GITHUB_CONNECT`
+4. **Etap manyèl obligatwa**: token API Railway a pa gen otorizasyon GitHub
+   (limit platfòm Railway konfime — gade "Limitasyon konnen" anba a), donk
+   SuperAdmin la dwe konekte repo `domondinterface-tech/myaccountingapp`
+   (branch `main`) nan sèvis Railway a manyèlman, yon sèl fwa, atravè
+   dashboard Railway a (Settings → Source). Paj detay tenant la bay lyen ak
+   enstriksyon egzak pou sa.
+5. Retounen nan paj detay tenant la, klike "Fini Deplwaman an"
+   (`runFinishDeploy` → `finishDeploy()`) pou deklanche premye deplwaman an.
+6. Si sa reyisi, tenant la vin `ACTIVE` ak yon URL ak yon modpas tanporè pou
    premye admin la itilize.
 
-## Estati aktyèl (enpòtan)
+## Dashboard jesyon tenant
 
-`src/lib/railway.ts` ekri ak konesans jeneral sou API GraphQL piblik Railway a
-(URL, header otantifikasyon, non mitasyon yo) — men **poko janm teste kont yon
-vre kont Railway**, paske pa gen `RAILWAY_API_TOKEN` disponib ankò nan
-anviwònman kote sa te ekri a, e sandbox la pa gen aksè rezo pou verifye
-dokimantasyon Railway a an dirèk. Anvan w konte sou li an pwodiksyon:
+- **Lis tenant yo** (`/`): tout tenant, estati yo, ak yon kolòn "Aktif" ki ka
+  klike pou aktive/dezaktive yon tenant.
+- **Paj detay tenant** (`/tenants/[id]`):
+  - Bouton Aktive/Dezaktive — se yon **drapo swivi sèlman**, li pa bloke aksè
+    tenant la nan pwòp enstans KB Books li; se jis yon fason pou SuperAdmin
+    swiv ki tenant ki toujou "vivan" biznis.
+  - Lyen dirèk + modpas tanporè ak yon bouton "Kopye" — pou SuperAdmin lan
+    ka konekte sou nenpòt enstans tenant ak kont admin li san li pa bezwen
+    chèche modpas la nan yon lòt kote (se yon senp lyen + modpas pataje, se
+    pa yon vre SSO).
+  - Kat "Rezime Finansye" (sèlman lè tenant la `ACTIVE`) — rele
+    `fetchTenantSummary()` ki fè yon apèl HTTP otantifye
+    (`x-superadmin-key`) sou `GET /api/superadmin/summary` nan pwòp enstans
+    KB Books tenant la, e afiche kach kòf, total aktif, pwofi net, ak si
+    bilan an balanse.
 
-1. Fè yon requête "introspection" kont API Railway a ak yon vre token pou
-   konfime non mitasyon/chan yo toujou kòrèk.
-2. Fè yon vre tès `provisionTenant()` kont yon tenant jetab.
+## Limitasyon konnen
 
-San `RAILWAY_API_TOKEN`, kreyasyon tenant toujou mache (ranje `Tenant` kreye
-nòmalman), men bouton "Provizyone" a retounen yon estati `BLOCKED_NO_TOKEN` ak
-yon mesaj ki eksplike sa.
+Token API Railway yo (kreye atravè paj "Tokens" kont Railway la) **pa gen
+otorizasyon GitHub App/OAuth pèsonèl** — konfime an dirèk kont API Railway a
+(requête `me`/`githubRepos` retounen "Not Authorized"). Se poutèt sa etap
+"konekte GitHub" la rete manyèl (etap 4 pi wo a). Pa gen okenn koreksyon kòd
+pou sa — se yon limit platfòm Railway.
 
 ## Devlopman lokal
 
@@ -56,6 +74,13 @@ Premye kont SuperAdmin la kreye otomatikman soti nan `ADMIN_EMAIL` /
 
 ## Varyab Anviwònman
 
-Gade `.env.example`. `RAILWAY_API_TOKEN` se sèl la ki opsyonèl pou devlopman
-lokal, men obligatwa pou aksyon "Provizyone" a reyèlman kreye yon sèvis
-Railway.
+Gade `.env.example`. Sou sèvè kb-superadmin an pwodiksyon, de varyab yo enpòtan:
+
+- `RAILWAY_API_TOKEN` — obligatwa pou aksyon "Provizyone" a reyèlman kreye
+  yon sèvis Railway.
+- `SUPERADMIN_API_KEY` — obligatwa pou kat "Rezime Finansye" a mache sou paj
+  detay tenant yo. Menm valè a dwe konfigire kòm varyab anviwònman sou pwòp
+  sèvis Railway chak tenant tou, paske se KB Books li menm ki verifye header
+  la (gade `.env.example` nan repo `myaccountingapp`). Tenant ki kreye
+  **anvan** varyab sa a te konfigire sou kb-superadmin bezwen l ajoute
+  manyèlman (Railway → sèvis tenant la → Variables).
