@@ -97,6 +97,32 @@ export async function toggleTenantActive(tenantId: string): Promise<void> {
 }
 
 /**
+ * Manually corrects a tenant's stored app URL. Needed because Railway's
+ * generated domain isn't always the one that ends up actually serving
+ * traffic (observed live: the domain from createDomain() at provisioning
+ * time was superseded by a different, suffix-less one after the manual
+ * GitHub-connect step) — there's no reliable API signal to detect that, so
+ * this is a manual escape hatch rather than something provisioning retries.
+ */
+export async function updateTenantAppUrl(tenantId: string, formData: FormData): Promise<void> {
+  await requireUser();
+
+  const raw = String(formData.get("appUrl") ?? "").trim();
+  if (!raw) return;
+  const appUrl = raw.replace(/\/+$/, "");
+  try {
+    new URL(appUrl);
+  } catch {
+    return;
+  }
+
+  await prisma.tenant.update({ where: { id: tenantId }, data: { appUrl } });
+
+  revalidatePath(`/tenants/${tenantId}`);
+  revalidatePath("/");
+}
+
+/**
  * Second half of provisioning: call once the SuperAdmin has connected the
  * GitHub repo by hand in the Railway dashboard for this tenant's service.
  */

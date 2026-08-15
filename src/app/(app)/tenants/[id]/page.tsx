@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { Card, PageHeader, Badge, SubmitButton, CopyButton } from "@/components/ui";
-import { runProvisioning, runFinishDeploy, toggleTenantActive } from "@/lib/actions/tenants";
+import { Card, PageHeader, Badge, SubmitButton, CopyButton, Field, inputClass } from "@/components/ui";
+import { runProvisioning, runFinishDeploy, toggleTenantActive, updateTenantAppUrl } from "@/lib/actions/tenants";
 import { fetchTenantSummary } from "@/lib/tenantSummary";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +18,7 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
   const provision = runProvisioning.bind(null, tenant.id);
   const finishDeploy = runFinishDeploy.bind(null, tenant.id);
   const toggleActive = toggleTenantActive.bind(null, tenant.id);
+  const updateAppUrl = updateTenantAppUrl.bind(null, tenant.id);
   const railwayProjectUrl = tenant.railwayProjectId ? `https://railway.com/project/${tenant.railwayProjectId}` : null;
 
   const summary = tenant.status === "ACTIVE" && tenant.appUrl ? await fetchTenantSummary(tenant.appUrl) : null;
@@ -204,6 +205,18 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
             <dd className="text-slate-700">{tenant.createdAt.toLocaleString("fr-HT")}</dd>
           </div>
         </dl>
+
+        <form action={updateAppUrl} className="mt-4 border-t border-slate-100 pt-4">
+          <Field label="URL Aplikasyon an">
+            <div className="flex gap-2">
+              <input type="url" name="appUrl" defaultValue={tenant.appUrl ?? ""} placeholder="https://..." className={inputClass} />
+              <SubmitButton variant="secondary">Modifye</SubmitButton>
+            </div>
+          </Field>
+          <p className="mt-1 text-xs text-slate-400">
+            Itil si domèn Railway a chanje apre koneksyon GitHub manyèl la — verifye domèn reyèl la nan Railway Settings → Networking.
+          </p>
+        </form>
       </Card>
     </div>
   );
