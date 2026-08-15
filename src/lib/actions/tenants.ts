@@ -107,7 +107,7 @@ export async function runFinishDeploy(tenantId: string): Promise<void> {
   if (!tenant || tenant.status !== "NEEDS_GITHUB_CONNECT") return;
   if (!tenant.railwayServiceId || !tenant.railwayEnvironmentId) return;
 
-  const result = await finishDeploy(tenant.railwayEnvironmentId, tenant.railwayServiceId);
+  const result = await finishDeploy(tenant.railwayEnvironmentId, tenant.railwayServiceId, tenant.appUrl ?? undefined);
 
   if (result.ok) {
     await prisma.tenant.update({

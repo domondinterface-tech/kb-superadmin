@@ -309,13 +309,35 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
 }
 
 /**
+ * True if `appUrl` responds at all (any non-5xx status, redirects included —
+ * a redirect to /login is the expected response on "/"). Used as a fallback
+ * signal when the Railway deploy-trigger mutation errors out even though a
+ * real deploy already succeeded (see finishDeploy below).
+ */
+async function isAppReachable(appUrl: string): Promise<boolean> {
+  try {
+    const res = await fetch(appUrl, { signal: AbortSignal.timeout(8000), redirect: "manual" });
+    return res.status < 500;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Second half of provisioning: call once the SuperAdmin has connected the
  * GitHub repo by hand in the Railway dashboard for this service (the one
  * flow that carries real GitHub authorization — see the file header). Just
  * triggers the first deploy; everything else was already set up by
  * provisionTenant().
+ *
+ * serviceInstanceDeploy has been observed to fail with "Repository not
+ * found or is not accessible" even right after a successful manual
+ * reconnect in the Railway dashboard — confirmed live to be a stale cached
+ * source reference on Railway's side, since a real push-triggered webhook
+ * deploy for the same service succeeds immediately after. So on failure we
+ * fall back to checking whether the app is actually live before giving up.
  */
-export async function finishDeploy(environmentId: string, serviceId: string): Promise<DeployResult> {
+export async function finishDeploy(environmentId: string, serviceId: string, appUrl?: string): Promise<DeployResult> {
   if (!process.env.RAILWAY_API_TOKEN) {
     return { ok: false, error: "RAILWAY_API_TOKEN pa konfigire sou sèvè a." };
   }
@@ -324,6 +346,9 @@ export async function finishDeploy(environmentId: string, serviceId: string): Pr
     return { ok: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    if (appUrl && (await isAppReachable(appUrl))) {
+      return { ok: true };
+    }
     return { ok: false, error: message };
   }
 }
