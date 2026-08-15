@@ -35,6 +35,52 @@ export function Badge({ children, tone = "default" }: { children: ReactNode; ton
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${toneClass}`}>{children}</span>;
 }
 
+export function StatCard({ icon, label, value, tone = "default" }: { icon: ReactNode; label: string; value: string | number; tone?: "default" | "positive" | "warning" }) {
+  const toneClass = {
+    default: "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400",
+    positive: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400",
+    warning: "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400",
+  }[tone];
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${toneClass}`}>{icon}</div>
+      <div className="min-w-0">
+        <div className="text-2xl font-semibold text-slate-900 dark:text-white">{value}</div>
+        <div className="truncate text-xs text-slate-500 dark:text-slate-400">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+const AVATAR_COLORS = [
+  "bg-indigo-100 text-indigo-700",
+  "bg-emerald-100 text-emerald-700",
+  "bg-amber-100 text-amber-700",
+  "bg-rose-100 text-rose-700",
+  "bg-sky-100 text-sky-700",
+  "bg-violet-100 text-violet-700",
+];
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  return hash;
+}
+
+/** Colored initials avatar — color is stable per `seed` (e.g. tenant id), not random per render. */
+export function Avatar({ name, seed }: { name: string; seed: string }) {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+  const color = AVATAR_COLORS[hashString(seed) % AVATAR_COLORS.length];
+  return (
+    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${color}`}>{initials || "?"}</span>
+  );
+}
+
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">

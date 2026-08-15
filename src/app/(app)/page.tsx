@@ -1,37 +1,48 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { Card, PageHeader, Badge } from "@/components/ui";
-import { toggleTenantActive } from "@/lib/actions/tenants";
-import type { TenantStatus } from "@/generated/prisma/enums";
+import { Card, PageHeader, StatCard } from "@/components/ui";
+import { TenantsTable } from "./tenants-table";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_TONE: Record<TenantStatus, "default" | "positive" | "negative" | "warning"> = {
-  PENDING: "default",
-  PROVISIONING: "warning",
-  NEEDS_GITHUB_CONNECT: "warning",
-  ACTIVE: "positive",
-  FAILED: "negative",
-  BLOCKED_NO_TOKEN: "negative",
-};
+function UsersIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-5 w-5">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"
+      />
+    </svg>
+  );
+}
 
-const STATUS_LABEL: Record<TenantStatus, string> = {
-  PENDING: "An atant",
-  PROVISIONING: "Ap kreye...",
-  NEEDS_GITHUB_CONNECT: "Mande konekte GitHub",
-  ACTIVE: "Aktif",
-  FAILED: "Echwe",
-  BLOCKED_NO_TOKEN: "Bloke — pa gen token",
-};
+function CheckIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-5 w-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+    </svg>
+  );
+}
+
+function PauseIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-5 w-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+    </svg>
+  );
+}
 
 export default async function DashboardPage() {
   const tenants = await prisma.tenant.findMany({ orderBy: { createdAt: "desc" } });
+  const activeCount = tenants.filter((t) => t.active).length;
+  const inactiveCount = tenants.length - activeCount;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Tenant yo"
-        description={`${tenants.length} enstans KB Books apa pou biznis ekstèn.`}
+        description="Jere tout tenant yo sou platfòm nan. Kreye, gade, ak jere kont tenant yo."
         action={
           <Link
             href="/tenants/new"
@@ -41,6 +52,12 @@ export default async function DashboardPage() {
           </Link>
         }
       />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard icon={<UsersIcon />} label="Total Tenant" value={tenants.length} />
+        <StatCard icon={<CheckIcon />} label="Tenant Aktif" value={activeCount} tone="positive" />
+        <StatCard icon={<PauseIcon />} label="Tenant Enaktif" value={inactiveCount} tone="warning" />
+      </div>
 
       <Card>
         {tenants.length === 0 ? (
@@ -53,47 +70,7 @@ export default async function DashboardPage() {
             <p className="text-sm text-slate-500">Pa gen tenant ankò. Klike &quot;+ Nouvo Tenant&quot; pou kreye premye a.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-                  <th className="pb-2 pr-4">Non</th>
-                  <th className="pb-2 pr-4">Mak</th>
-                  <th className="pb-2 pr-4">Imèl Admin</th>
-                  <th className="pb-2 pr-4">Estati</th>
-                  <th className="pb-2 pr-4">Aktif</th>
-                  <th className="pb-2">Kreye</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tenants.map((t) => {
-                  const toggle = toggleTenantActive.bind(null, t.id);
-                  return (
-                    <tr key={t.id} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50">
-                      <td className="py-3 pr-4">
-                        <Link href={`/tenants/${t.id}`} className="font-medium text-indigo-600 hover:underline">
-                          {t.name}
-                        </Link>
-                      </td>
-                      <td className="py-3 pr-4 text-slate-600">{t.brandName}</td>
-                      <td className="py-3 pr-4 text-slate-600">{t.adminEmail}</td>
-                      <td className="py-3 pr-4">
-                        <Badge tone={STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</Badge>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <form action={toggle}>
-                          <button type="submit" className="cursor-pointer">
-                            <Badge tone={t.active ? "positive" : "default"}>{t.active ? "Aktif" : "Dezaktive"}</Badge>
-                          </button>
-                        </form>
-                      </td>
-                      <td className="py-3 text-slate-500">{t.createdAt.toLocaleDateString("fr-HT")}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <TenantsTable tenants={tenants} />
         )}
       </Card>
     </div>
