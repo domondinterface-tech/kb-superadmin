@@ -6,16 +6,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await requireUser();
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="min-h-screen bg-slate-50">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <Link href="/" className="text-sm font-semibold text-slate-900">
-            KB SuperAdmin
+          <Link href="/" className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white">KB</span>
+            <span className="text-sm font-semibold text-slate-900">SuperAdmin</span>
           </Link>
           <div className="flex items-center gap-4 text-sm text-slate-600">
-            <span>{user.name}</span>
+            <span className="hidden sm:inline">{user.name}</span>
             <form action={logout}>
-              <button type="submit" className="font-medium text-slate-700 hover:underline">
+              <button type="submit" className="font-medium text-slate-700 transition-colors hover:text-indigo-600">
                 Dekonekte
               </button>
             </form>

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Card, PageHeader, Badge, SubmitButton, CopyButton, Field, inputClass } from "@/components/ui";
 import { runProvisioning, runFinishDeploy, toggleTenantActive, updateTenantAppUrl } from "@/lib/actions/tenants";
@@ -25,6 +26,13 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
 
   return (
     <div className="space-y-6">
+      <Link href="/" className="inline-flex items-center gap-1 text-sm text-slate-500 transition-colors hover:text-indigo-600">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+        </svg>
+        Tenant yo
+      </Link>
+
       <PageHeader
         title={tenant.name}
         description={tenant.brandName}

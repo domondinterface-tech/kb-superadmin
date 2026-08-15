@@ -70,10 +70,12 @@ export function SubmitButton({
   children,
   pending: pendingOverride,
   variant = "primary",
+  fullWidth = false,
 }: {
   children: ReactNode;
   pending?: boolean;
   variant?: "primary" | "secondary";
+  fullWidth?: boolean;
 }) {
   const { pending: formPending } = useFormStatus();
   const pending = pendingOverride ?? formPending;
@@ -85,7 +87,7 @@ export function SubmitButton({
     <button
       type="submit"
       disabled={pending}
-      className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${variantClass}`}
+      className={`${fullWidth ? "flex w-full" : "inline-flex"} items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${variantClass}`}
     >
       {children}
     </button>

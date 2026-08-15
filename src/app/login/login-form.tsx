@@ -17,8 +17,12 @@ export function LoginForm() {
       <Field label="Modpas">
         <input name="password" type="password" required className={inputClass} autoComplete="current-password" />
       </Field>
-      {state.error && <p className="text-sm text-rose-600">{state.error}</p>}
-      <SubmitButton pending={isPending}>{isPending ? "Ap konekte..." : "Konekte"}</SubmitButton>
+      {state.error && (
+        <p className="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-600">{state.error}</p>
+      )}
+      <SubmitButton pending={isPending} fullWidth>
+        {isPending ? "Ap konekte..." : "Konekte"}
+      </SubmitButton>
     </form>
   );
 }
